@@ -1,101 +1,184 @@
-import Image from "next/image";
+'use client';
+import { useState } from 'react';
 
-export default function Home() {
+const CHOICES = [
+  { symbol: 'Research Agent', name: 'Researches the industry and segments relevant to the company.' },
+  { symbol: 'Market Standards & Use Case Generation', name: 'Analyzes industry trends and suggests AI/ML use cases.' },
+  { symbol: 'Resource Asset Collection', name: 'Collects datasets and resources relevant to generated use cases.' },
+  { symbol: 'Final Proposal Agent', name: 'Generates a final proposal with prioritized use cases and references.' },
+].sort((a, b) => a.name.localeCompare(b.name));
+
+interface Choice {
+  symbol: string;
+  name: string;
+}
+
+export default function StockAnalysisPage() {
+  const [selectedChoices, setselectedChoices] = useState<Choice[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [, setIsLoading] = useState(false);
+  const [report, setReport] = useState('');
+  const [stage, setStage] = useState<'input' | 'loading' | 'report'>('input');
+
+  const handleChoiceSelect = (choice: Choice) => {
+    if (selectedChoices.length >= 3) {
+      setError('Maximum 3 choices allowed');
+      return;
+    }
+    if (selectedChoices.some(t => t.symbol === choice.symbol)) {
+      setError('Choice already selected');
+      return;
+    }
+    setselectedChoices([...selectedChoices, choice]);
+    setError('');
+  };
+
+  const handleRemoveChoice = (symbol: string) => {
+    setselectedChoices(selectedChoices.filter(t => t.symbol !== symbol));
+    setError('');
+  };
+
+  const handleGenerateReport = async () => {
+    if (selectedChoices.length === 0) {
+      setError('Please select at least one choice');
+      return;
+    }
+
+    setStage('loading');
+    setIsLoading(true);
+
+    try {
+      const choicesList = selectedChoices.map(t => `${t.name} (${t.symbol})`).join(', ');
+      const prompt = `As a multi-agent architecture system, analyze the following agents for an AI/GenAI use case generation system: ${choicesList}. 
+      Generate a structured report where each agent's purpose, actions, and output are outlined. Use an informative, professional tone.
+      
+      Example:
+      - **Research Agent**: Conducts market research...
+      - **Use Case Generation**: Proposes AI/ML applications...
+      `;
+
+
+      const aiResponse = await fetch('https://gemini-api-worker.waibhav204.workers.dev/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(prompt)
+      });
+
+      if (!aiResponse.ok) {
+        throw new Error('Failed to generate report');
+      }
+
+      const reportData = await aiResponse.json();
+      setReport(reportData);
+      setStage('report');
+    } catch {
+      setError('Failed to generate report. Please try again.');
+      setStage('input');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <main className="bg-white">
+      <div className="relative isolate px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl py-32 sm:py-48 lg:py-56">
+          <div className="text-center mb-8">
+          <h1 className="text-balance text-5xl font-semibold tracking-tight text-gray-600 sm:text-7xl">
+          Market Research & Use Case Generation Agent
+</h1>
+<p className="mt-8 text-pretty text-lg font-medium text-gray-600 sm:text-xl/8">
+Select agents to generate a structured AI/GenAI use case report for a company or industry.
+</p>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          </div>
+
+          <div className="space-y-8">
+            {stage === 'input' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {CHOICES.map((choice) => (
+                  <button
+                    key={choice.symbol}
+                    onClick={() => handleChoiceSelect(choice)}
+                    disabled={selectedChoices.some(t => t.symbol === choice.symbol)}
+                    className={`p-4 rounded-xl text-left transition-all duration-200
+                      ${selectedChoices.some(t => t.symbol === choice.symbol)
+                        ? 'bg-purple-100 text-purple-700 cursor-not-allowed'
+                        : 'bg-white border border-gray-200 hover:border-purple-400 hover:shadow-md'
+                      }`}
+                  >
+                    <div className="font-semibold text-black">{choice.symbol}</div>
+                    <div className="text-sm text-gray-600">{choice.name}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {selectedChoices.length > 0 && (
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-xl">
+                <h2 className="font-semibold mb-4 text-gray-700">Selected Choices:</h2>
+                <div className="flex flex-wrap gap-3">
+                  {selectedChoices.map((choice) => (
+                    <div
+                      key={choice.symbol}
+                      className="group flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm"
+                    >
+                      <span className="font-medium text-gray-700">{choice.symbol}</span>
+                      <button
+                        onClick={() => handleRemoveChoice(choice.symbol)}
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div className="text-red-500 text-center text-sm bg-red-50 p-3 rounded-lg">
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={handleGenerateReport}
+              disabled={selectedChoices.length === 0}
+              className={`w-full p-4 rounded-xl font-medium text-lg transition-all duration-200
+                ${selectedChoices.length === 0
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl'
+                }`}
+            >
+              Generate Analysis
+            </button>
+
+            {stage === 'loading' && (
+              <div className="flex flex-col items-center justify-center py-16 space-y-6">
+                <div className="animate-spin rounded-full h-16 w-16 border-4 border-purple-600 border-t-transparent"></div>
+                <p className="text-gray-500">Generating report...</p>
+              </div>
+            )}
+
+            {/* Report Section */}
+            {stage === 'report' && (
+              <div className="bg-white p-6 rounded-xl shadow-md">
+                <h2 className="font-semibold text-lg text-gray-700">Analysis Report</h2>
+                <p className="mt-4 text-gray-600">{report}</p>
+                <button
+                  onClick={() => setStage('input')}
+                  className="mt-6 w-full p-4 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition"
+                >
+                  Generate Another Report
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </div>
+    </main>
   );
 }
